@@ -124,15 +124,17 @@ function scrapeUserPurchaseHistory(username, password) {
         //   console.log(`This is the return length${similarProduct}`);
         //   return similarProduct;
         //  });
-        // await page.goto('https://www.amazon.com/gp/your-account/order-history');
-        yield page.goto('https://www.amazon.com/gp/history/*');
+        yield new Promise(resolve => setTimeout(resolve, 5000));
+        yield page.goto('https://www.amazon.com/gp/history/');
         const relatedItems = yield page.evaluate(() => {
-            const itemsList = document.querySelectorAll('.a-cardui .p13n-grid-content');
+            const itemsList = document.querySelectorAll('.p13n-grid-content');
             const itemsData = [];
             let itemsFilter = [];
             itemsList.forEach((itemElement) => {
                 var _a, _b, _c, _d;
-                const title = (_a = itemElement.querySelector('.a-size-small')) === null || _a === void 0 ? void 0 : _a.textContent.trim();
+                const titleDiv = itemElement.querySelector('.a-link-normal');
+                const title = (_a = itemElement.querySelector('.p13n-sc-line-clamp-1')) === null || _a === void 0 ? void 0 : _a.textContent.trim();
+                const link = itemElement.querySelector('.a-link-normal').getAttribute('href');
                 const imageUrl = (_b = itemElement.querySelector('img')) === null || _b === void 0 ? void 0 : _b.getAttribute('src');
                 let price = ((_d = (_c = itemElement.querySelector('.a-color-price')) === null || _c === void 0 ? void 0 : _c.textContent) === null || _d === void 0 ? void 0 : _d.trim()) || '';
                 price = price.replace(/[^\d.]/g, '');
@@ -140,7 +142,7 @@ function scrapeUserPurchaseHistory(username, password) {
                 priceNum = parseFloat(price).toFixed(2);
                 priceNum.toString();
                 price = priceNum.toString();
-                itemsData.push({ title, imageUrl, price });
+                itemsData.push({ title, imageUrl, price, link });
             });
             itemsData.forEach((item, index) => {
                 if (index === 10) {

@@ -124,16 +124,16 @@ async function scrapeUserPurchaseHistory(username: string, password: string): Pr
   //   console.log(`This is the return length${similarProduct}`);
   //   return similarProduct;
   //  });
-
-  // await page.goto('https://www.amazon.com/gp/your-account/order-history');
-  await page.goto('https://www.amazon.com/gp/yourstore')
+  await new Promise(resolve => setTimeout(resolve, 5000))
+  await page.goto('https://www.amazon.com/gp/history/')
   const relatedItems = await page.evaluate(() => {
-  const itemsList : any | null = document.querySelectorAll('.a-cardui .p13n-grid-content')
+  const itemsList : any | null = document.querySelectorAll('.p13n-grid-content')
   const itemsData : any[] = [];
   let itemsFilter: any[] = [];
   itemsList.forEach((itemElement: any | null) => {
-    const title: any = itemElement.querySelector('.a-size-small')?.textContent.trim();
-
+    const titleDiv = itemElement.querySelector('.a-link-normal')
+    const title: any = itemElement.querySelector('.p13n-sc-line-clamp-1')?.textContent.trim();
+    const link: string = itemElement.querySelector('.a-link-normal').getAttribute('href');
     const imageUrl = itemElement.querySelector('img')?.getAttribute('src')
      let price = itemElement.querySelector('.a-color-price')?.textContent?.trim() || '';
       price = price.replace(/[^\d.]/g, '');
@@ -141,7 +141,7 @@ async function scrapeUserPurchaseHistory(username: string, password: string): Pr
       priceNum = parseFloat(price).toFixed(2);
       priceNum.toString()
       price = priceNum.toString();
-     itemsData.push({title, imageUrl, price})
+     itemsData.push({title, imageUrl, price, link})
   })
   itemsData.forEach((item, index) => {
     if ( index === 10) {
