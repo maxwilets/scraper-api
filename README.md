@@ -1,6 +1,6 @@
-#SCRAPER API
+# SCRAPER API
 This is an API to scrape amazon.com
-##Instructions
+## Instructions
   * npm install
   * npm run build
   * npm start
