@@ -28,6 +28,7 @@ async function scrapeAmazon(searchString: string) {
   const products = await page.evaluate(() => {
     const productList: any[] = [];
     const productElements = document.querySelectorAll('.s-result-item');
+    let filterList: any[] = [];
 
     productElements.forEach((productElement) => {
       const title = productElement.querySelector('.a-text-normal')?.textContent?.trim() || '';
@@ -41,9 +42,10 @@ async function scrapeAmazon(searchString: string) {
       const link = productElement.querySelector('a')?.getAttribute('href') || '';
 
       productList.push({ title, price, imageUrl, link });
+      filterList = productList.filter((item, index) =>  item.title != '')
     });
-
-    return productList;
+     
+    return filterList;
   });
 
   await browser.close();
@@ -57,9 +59,6 @@ const authenticateUser = async (req: Request, res: Response, next: Function) => 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
-
-  // Perform authentication logic here (e.g., verify credentials with a database)
-  // For demonstration purposes, always allow access
   next();
 };
 
@@ -102,28 +101,59 @@ async function scrapeUserPurchaseHistory(username: string, password: string): Pr
     await page.waitForNavigation();
 
   // Navigate to user's order history page
-  await page.goto('https://www.amazon.com/gp/css/order-history');
+  // await page.goto('https://www.amazon.com/gp/your-account/order-history');
 
   // Scraping logic to extract last 10 purchases
-  const lastTenPurchases: any[] | NodeListOf<Element> | any = await page.evaluate(() => {
-    // Implement logic to extract last 10 purchases from the order history page
-    // For demonstration purposes, returning dummy data\
-    const ordersList = [...document.querySelectorAll('.order')];
-    const ordersData: any[] = [];
-    console.log(ordersList);
-    ordersList.forEach((order, index) => {
-      if (index > 9) {
-        return;
-      } else {
-        ordersData.push(order)
-      }
-    }) 
-    return ordersData;
-  });
+  // const lastTenPurchases: any[] | NodeListOf<Element> | any = await page.evaluate(() => {
+  //   // Implement logic to extract last 10 purchases from the order history page
+  // // Code for orders list 
+  // //   const ordersList = [...document.querySelectorAll('.order')];
+  // //   const ordersData: any[] = [];
+  // //   console.log(ordersList);
+  // //   ordersList.forEach((order, index) => {
+  // //     if (index > 9) {
+  // //       return;
+  // //     } else {
+  // //       ordersData.push(order)
+  // //     }
+  // //   }) 
+  // //   return ordersData;
+  // // Don't have recent orders to accurately test testing also viewed
+  //   // const similarProduct = [...document.querySelectorAll('.a-carousel-card')];
+  //   const similarProduct = document.querySelector('.num-orders')
+  //   console.log(`This is the return length${similarProduct}`);
+  //   return similarProduct;
+  //  });
+
+  // await page.goto('https://www.amazon.com/gp/your-account/order-history');
+  await page.goto('https://www.amazon.com/gp/yourstore')
+  const relatedItems = await page.evaluate(() => {
+  const itemsList : any | null = document.querySelectorAll('.a-cardui .p13n-grid-content')
+  const itemsData : any[] = [];
+  let itemsFilter: any[] = [];
+  itemsList.forEach((itemElement: any | null) => {
+    const title: any = itemElement.querySelector('.a-size-small')?.textContent.trim();
+
+    const imageUrl = itemElement.querySelector('img')?.getAttribute('src')
+     let price = itemElement.querySelector('.a-color-price')?.textContent?.trim() || '';
+      price = price.replace(/[^\d.]/g, '');
+      let priceNum: number | string = parseInt(price);
+      priceNum = parseFloat(price).toFixed(2);
+      priceNum.toString()
+      price = priceNum.toString();
+     itemsData.push({title, imageUrl, price})
+  })
+  itemsData.forEach((item, index) => {
+    if ( index === 10) {
+      return;
+    } else { itemsFilter.push(item)}
+  })
+  return itemsFilter;
+});
 
   await browser.close();
-  console.log(lastTenPurchases)
-  return lastTenPurchases;
+  console.log(relatedItems)
+  return relatedItems;
 }
 
 app.listen(PORT, () => {

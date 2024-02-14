@@ -39,6 +39,7 @@ function scrapeAmazon(searchString) {
         const products = yield page.evaluate(() => {
             const productList = [];
             const productElements = document.querySelectorAll('.s-result-item');
+            let filterList = [];
             productElements.forEach((productElement) => {
                 var _a, _b, _c, _d, _e, _f;
                 const title = ((_b = (_a = productElement.querySelector('.a-text-normal')) === null || _a === void 0 ? void 0 : _a.textContent) === null || _b === void 0 ? void 0 : _b.trim()) || '';
@@ -51,8 +52,9 @@ function scrapeAmazon(searchString) {
                 const imageUrl = ((_e = productElement.querySelector('img')) === null || _e === void 0 ? void 0 : _e.getAttribute('src')) || '';
                 const link = ((_f = productElement.querySelector('a')) === null || _f === void 0 ? void 0 : _f.getAttribute('href')) || '';
                 productList.push({ title, price, imageUrl, link });
+                filterList = productList.filter((item, index) => item.title != '');
             });
-            return productList;
+            return filterList;
         });
         yield browser.close();
         return products;
@@ -64,8 +66,6 @@ const authenticateUser = (req, res, next) => __awaiter(void 0, void 0, void 0, f
     if (!username || !password) {
         return res.status(400).json({ error: 'Username and password are required' });
     }
-    // Perform authentication logic here (e.g., verify credentials with a database)
-    // For demonstration purposes, always allow access
     next();
 });
 app.post('/scrape', authenticateUser, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -95,34 +95,66 @@ function scrapeUserPurchaseHistory(username, password) {
         yield page.goto('https://www.amazon.com/gp/sign-in.html');
         // Fill in username and password fields
         yield page.waitForSelector(selectors.emailid);
-        yield page.type(selectors.emailid, "satyam@gmail.com", { delay: 100 });
+        yield page.type(selectors.emailid, username, { delay: 100 });
         yield page.click(selectors.continue);
         yield page.waitForSelector(selectors.password);
-        yield page.type(selectors.password, "mypassword", { delay: 100 });
+        yield page.type(selectors.password, password, { delay: 100 });
         yield page.click(selectors.singin);
         yield page.waitForNavigation();
         // Navigate to user's order history page
-        yield page.goto('https://www.amazon.com/gp/css/order-history');
+        // await page.goto('https://www.amazon.com/gp/your-account/order-history');
         // Scraping logic to extract last 10 purchases
-        const lastTenPurchases = yield page.evaluate(() => {
-            // Implement logic to extract last 10 purchases from the order history page
-            // For demonstration purposes, returning dummy data\
-            const ordersList = [...document.querySelectorAll('.order')];
-            const ordersData = [];
-            console.log(ordersList);
-            ordersList.forEach((order, index) => {
-                if (index > 9) {
+        // const lastTenPurchases: any[] | NodeListOf<Element> | any = await page.evaluate(() => {
+        //   // Implement logic to extract last 10 purchases from the order history page
+        // // Code for orders list 
+        // //   const ordersList = [...document.querySelectorAll('.order')];
+        // //   const ordersData: any[] = [];
+        // //   console.log(ordersList);
+        // //   ordersList.forEach((order, index) => {
+        // //     if (index > 9) {
+        // //       return;
+        // //     } else {
+        // //       ordersData.push(order)
+        // //     }
+        // //   }) 
+        // //   return ordersData;
+        // // Don't have recent orders to accurately test testing also viewed
+        //   // const similarProduct = [...document.querySelectorAll('.a-carousel-card')];
+        //   const similarProduct = document.querySelector('.num-orders')
+        //   console.log(`This is the return length${similarProduct}`);
+        //   return similarProduct;
+        //  });
+        // await page.goto('https://www.amazon.com/gp/your-account/order-history');
+        yield page.goto('https://www.amazon.com/gp/history/*');
+        const relatedItems = yield page.evaluate(() => {
+            const itemsList = document.querySelectorAll('.a-cardui .p13n-grid-content');
+            const itemsData = [];
+            let itemsFilter = [];
+            itemsList.forEach((itemElement) => {
+                var _a, _b, _c, _d;
+                const title = (_a = itemElement.querySelector('.a-size-small')) === null || _a === void 0 ? void 0 : _a.textContent.trim();
+                const imageUrl = (_b = itemElement.querySelector('img')) === null || _b === void 0 ? void 0 : _b.getAttribute('src');
+                let price = ((_d = (_c = itemElement.querySelector('.a-color-price')) === null || _c === void 0 ? void 0 : _c.textContent) === null || _d === void 0 ? void 0 : _d.trim()) || '';
+                price = price.replace(/[^\d.]/g, '');
+                let priceNum = parseInt(price);
+                priceNum = parseFloat(price).toFixed(2);
+                priceNum.toString();
+                price = priceNum.toString();
+                itemsData.push({ title, imageUrl, price });
+            });
+            itemsData.forEach((item, index) => {
+                if (index === 10) {
                     return;
                 }
                 else {
-                    ordersData.push(order);
+                    itemsFilter.push(item);
                 }
             });
-            return ordersData;
+            return itemsFilter;
         });
         yield browser.close();
-        console.log(lastTenPurchases);
-        return lastTenPurchases;
+        console.log(relatedItems);
+        return relatedItems;
     });
 }
 app.listen(PORT, () => {
