@@ -124,15 +124,24 @@ function scrapeUserPurchaseHistory(username, password) {
         //   console.log(`This is the return length${similarProduct}`);
         //   return similarProduct;
         //  });
-        yield new Promise(resolve => setTimeout(resolve, 5000));
         yield page.goto('https://www.amazon.com/gp/history/');
+        yield page.evaluate(() => __awaiter(this, void 0, void 0, function* () {
+            // Define a function to scroll to the bottom of the page
+            const scrollToBottom = () => __awaiter(this, void 0, void 0, function* () {
+                window.scrollTo(0, document.body.scrollHeight);
+                yield new Promise(resolve => setTimeout(resolve, 500)); // Wait for .5 second after scrolling
+            });
+            // Scroll multiple times to ensure all items are loaded to get the lazy loaded cards
+            for (let i = 0; i < 2; i++) {
+                yield scrollToBottom();
+            }
+        }));
         const relatedItems = yield page.evaluate(() => {
             const itemsList = document.querySelectorAll('.p13n-grid-content');
             const itemsData = [];
             let itemsFilter = [];
             itemsList.forEach((itemElement) => {
                 var _a, _b, _c, _d;
-                const titleDiv = itemElement.querySelector('.a-link-normal');
                 const title = (_a = itemElement.querySelector('.p13n-sc-line-clamp-1')) === null || _a === void 0 ? void 0 : _a.textContent.trim();
                 const link = itemElement.querySelector('.a-link-normal').getAttribute('href');
                 const imageUrl = (_b = itemElement.querySelector('img')) === null || _b === void 0 ? void 0 : _b.getAttribute('src');

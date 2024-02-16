@@ -124,14 +124,27 @@ async function scrapeUserPurchaseHistory(username: string, password: string): Pr
   //   console.log(`This is the return length${similarProduct}`);
   //   return similarProduct;
   //  });
-  await new Promise(resolve => setTimeout(resolve, 5000))
-  await page.goto('https://www.amazon.com/gp/history/')
+
+  await page.goto('https://www.amazon.com/gp/history/');
+
+  await page.evaluate(async () => {
+  // Define a function to scroll to the bottom of the page
+  const scrollToBottom = async () => {
+    window.scrollTo(0, document.body.scrollHeight);
+    await new Promise(resolve => setTimeout(resolve, 500)); // Wait for .5 second after scrolling
+  };
+
+  // Scroll multiple times to ensure all items are loaded to get the lazy loaded cards
+  for (let i = 0; i < 2; i++) {
+    await scrollToBottom();
+  }
+});
+
   const relatedItems = await page.evaluate(() => {
   const itemsList : any | null = document.querySelectorAll('.p13n-grid-content')
   const itemsData : any[] = [];
   let itemsFilter: any[] = [];
   itemsList.forEach((itemElement: any | null) => {
-    const titleDiv = itemElement.querySelector('.a-link-normal')
     const title: any = itemElement.querySelector('.p13n-sc-line-clamp-1')?.textContent.trim();
     const link: string = itemElement.querySelector('.a-link-normal').getAttribute('href');
     const imageUrl = itemElement.querySelector('img')?.getAttribute('src')
