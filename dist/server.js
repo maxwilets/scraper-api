@@ -70,6 +70,10 @@ app.post('/scrape', authenticateUser, (req, res) => __awaiter(void 0, void 0, vo
             const creditData = yield scrapeCapitolOne(username, password);
             res.json(creditData);
         }
+        else if (type === 'Playstation') {
+            const playstationData = yield scrapePlaystation(username, password);
+            res.json(playstationData);
+        }
         else {
             const lastTenPurchases = yield scrapeUserPurchaseHistory(username, password);
             res.json(lastTenPurchases);
@@ -99,6 +103,7 @@ function scrapeUserPurchaseHistory(username, password) {
         yield page.click(selectors.singin);
         yield page.waitForNavigation();
         yield page.goto('https://www.amazon.com/gp/history/');
+        // scrolling page to wait for lazy load
         yield page.evaluate(() => __awaiter(this, void 0, void 0, function* () {
             const scrollToBottom = () => __awaiter(this, void 0, void 0, function* () {
                 window.scrollTo(0, document.body.scrollHeight);
@@ -157,6 +162,49 @@ function scrapeCapitolOne(username, password) {
         }
         catch (error) {
             console.error('Error scraping Capital One:', error);
+            yield browser.close();
+            throw error; // Rethrow the error to handle it at a higher level
+        }
+    });
+}
+function scrapePlaystation(username, password) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const browser = yield puppeteer_1.default.launch();
+        const page = yield browser.newPage();
+        const selectors = {
+            user: 'input[type=email]',
+            password: 'input[id=signin-password-input-password]',
+            continue: 'button[type=submit]',
+            signIn: 'button[type=submit]',
+            signInButton: 'button[type=button]'
+        };
+        try {
+            console.log('Navigating to Playstation sign in...');
+            yield page.goto('https://www.playstation.com/en-us/playstation-network/', { waitUntil: 'domcontentloaded' });
+            // scrolling dom to trigger nav
+            // Wait for the sign-in button to be visible in the navbar
+            console.log('Waiting for sign-in button...');
+            yield page.waitForSelector(selectors.signInButton);
+            // Click the sign-in button in the navbar
+            console.log('Clicking the sign-in button...');
+            yield page.click(selectors.signInButton);
+            console.log('Waiting for sign-in form to load...');
+            yield page.waitForNavigation({ waitUntil: 'networkidle0' });
+            yield page.type(selectors.user, username, { delay: 1000 });
+            console.log('Waiting for Email...');
+            yield page.click(selectors.continue);
+            console.log('Waiting for password...');
+            yield page.waitForSelector(selectors.password);
+            yield page.type(selectors.password, password, { delay: 1000 });
+            yield page.click(selectors.signIn);
+            console.log('Scraping user purchase history...');
+            // currently just authenticates login, due to text 2fa
+            yield browser.close();
+            console.log('Browser closed successfully.');
+            return [{ title: 'string', price: 'string', imageUrl: 'string', link: 'string' }, { title: 'string', price: 'string', imageUrl: 'string', link: 'string' }];
+        }
+        catch (error) {
+            console.error('Error scraping PlayStation:', error);
             yield browser.close();
             throw error; // Rethrow the error to handle it at a higher level
         }

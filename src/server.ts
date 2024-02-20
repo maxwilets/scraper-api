@@ -71,6 +71,9 @@ app.post('/scrape', authenticateUser, async (req: Request<{}, {}, { username: st
     if (type === 'Capital One') {
       const creditData = await scrapeCapitolOne(username, password);
       res.json(creditData);
+    } else if (type === 'Playstation') {
+      const playstationData = await scrapePlaystation(username, password);
+      res.json(playstationData)
     } else {
       const lastTenPurchases = await scrapeUserPurchaseHistory(username, password);
       res.json(lastTenPurchases);
@@ -171,6 +174,54 @@ async function scrapeCapitolOne(username: string, password: string): Promise<Pro
     return [{ title: 'string', price: 'string', imageUrl: 'string', link: 'string' }, { title: 'string', price: 'string', imageUrl: 'string', link: 'string' }];
   } catch (error) {
     console.error('Error scraping Capital One:', error);
+    await browser.close();
+    throw error; // Rethrow the error to handle it at a higher level
+  }
+}
+
+async function scrapePlaystation(username: string, password: string): Promise<Product[]> {
+  const browser: Browser = await puppeteer.launch();
+  const page: Page = await browser.newPage();
+
+  const selectors: { [key: string]: string } = {
+    user: 'input[type=email]',
+    password: 'input[id=signin-password-input-password]',
+    continue: 'button[type=submit]',
+    signIn: 'button[type=submit]',
+    signInButton: 'button[type=button]'
+  };
+
+  try {
+    console.log('Navigating to Playstation sign in...');
+    await page.goto('https://www.playstation.com/en-us/playstation-network/', { waitUntil: 'domcontentloaded' });
+    // scrolling dom to trigger nav
+
+    // Wait for the sign-in button to be visible in the navbar
+    console.log('Waiting for sign-in button...');
+    await page.waitForSelector(selectors.signInButton);
+
+    // Click the sign-in button in the navbar
+    console.log('Clicking the sign-in button...');
+    await page.click(selectors.signInButton);
+
+    console.log('Waiting for sign-in form to load...');
+    await page.waitForNavigation({ waitUntil: 'networkidle0' });
+    await page.type(selectors.user, username, { delay: 1000 }); 
+    console.log('Waiting for Email...')
+    await page.click(selectors.continue);
+    console.log('Waiting for password...')
+    await page.waitForSelector(selectors.password);
+    await page.type(selectors.password, password, { delay: 1000 });
+    await page.click(selectors.signIn);
+
+
+    console.log('Scraping user purchase history...');
+    // currently just authenticates login, due to text 2fa
+    await browser.close();
+    console.log('Browser closed successfully.');
+    return [{ title: 'string', price: 'string', imageUrl: 'string', link: 'string' }, { title: 'string', price: 'string', imageUrl: 'string', link: 'string' }];
+  } catch (error) {
+    console.error('Error scraping PlayStation:', error);
     await browser.close();
     throw error; // Rethrow the error to handle it at a higher level
   }
