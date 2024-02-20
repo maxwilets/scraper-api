@@ -139,6 +139,7 @@ function scrapeCapitolOne(username, password) {
             user: 'input[id=usernameInputField]',
             password: 'input[id=pwInputField]',
             signIn: 'button[type=submit]',
+            redirect: 'div.ci-step-up-container'
         };
         try {
             console.log('Navigating to Capital One sign-in page...');
@@ -153,8 +154,15 @@ function scrapeCapitolOne(username, password) {
             yield page.click(selectors.signIn);
             // Wait for navigation to complete
             console.log('Waiting for navigation...');
-            yield page.waitForNavigation({ waitUntil: 'networkidle0' });
-            console.log('Scraping user purchase history...');
+            yield page.waitForNavigation();
+            const isRedirect = yield page.waitForSelector(selectors.redirect, { timeout: 6000 }).then(() => true).catch(() => false);
+            if (isRedirect) {
+                console.log('successful login');
+            }
+            else {
+                console.log('login failed invalid credentials');
+            }
+            // just throwing empy data I odnt want to show finance information
             yield browser.close();
             console.log('Browser closed successfully.');
             return [{ title: 'string', price: 'string', imageUrl: 'string', link: 'string' }, { title: 'string', price: 'string', imageUrl: 'string', link: 'string' }];
@@ -180,7 +188,6 @@ function scrapePlaystation(username, password) {
         try {
             console.log('Navigating to Playstation sign in...');
             yield page.goto('https://www.playstation.com/en-us/playstation-network/', { waitUntil: 'domcontentloaded' });
-            // scrolling dom to trigger nav
             // Wait for the sign-in button to be visible in the navbar
             console.log('Waiting for sign-in button...');
             yield page.waitForSelector(selectors.signInButton);
@@ -188,6 +195,7 @@ function scrapePlaystation(username, password) {
             console.log('Clicking the sign-in button...');
             yield page.click(selectors.signInButton);
             console.log('Waiting for sign-in form to load...');
+            // goes to sign in form waiting to load
             yield page.waitForNavigation({ waitUntil: 'networkidle0' });
             yield page.type(selectors.user, username, { delay: 1000 });
             console.log('Waiting for Email...');
