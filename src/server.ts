@@ -1,16 +1,23 @@
 import express, { Request, Response } from 'express';
-import puppeteer from 'puppeteer';
+import puppeteer, { Browser, Page } from 'puppeteer';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 
-const app = express();
-const PORT = process.env.PORT || 5001;
+interface Product {
+  title: string;
+  price: string;
+  imageUrl: string;
+  link: string;
+}
 
-app.use(cors())
+const app = express();
+const PORT: number = parseInt(process.env.PORT!) || 5001;
+
+app.use(cors());
 app.use(bodyParser.json());
 
-app.get('/scrape', async  (req: { query: { search_string: string } }, res: { json: (data: any) => void, status: (code: number) => { json: (data: { error: string }) => void } }) => {
-  const searchString: string = req.query.search_string as string;
+app.get('/scrape', async (req: Request<{}, {}, {}, { search_string: string }>, res: Response) => {
+  const searchString: string = req.query.search_string;
   try {
     const scrapedData = await scrapeAmazon(searchString);
     res.json(scrapedData);
@@ -20,32 +27,28 @@ app.get('/scrape', async  (req: { query: { search_string: string } }, res: { jso
   }
 });
 
-async function scrapeAmazon(searchString: string) {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
+async function scrapeAmazon(searchString: string): Promise<Product[]> {
+  const browser: Browser = await puppeteer.launch();
+  const page: Page = await browser.newPage();
   await page.goto(`https://www.amazon.com/s?k=${searchString}`);
 
-  const products = await page.evaluate(() => {
-    const productList: any[] = [];
-    const productElements = document.querySelectorAll('.s-result-item');
-    let filterList: any[] = [];
+  const products: Product[] = await page.evaluate(() => {
+    const productList: Product[] = [];
+    const productElements: NodeListOf<Element> = document.querySelectorAll('.s-result-item');
 
-    productElements.forEach((productElement) => {
-      const title = productElement.querySelector('.a-text-normal')?.textContent?.trim() || '';
-      let price = productElement.querySelector('.a-price')?.textContent?.trim() || '';
-      price = price.replace(/[^\d.]/g, '');
-      let priceNum: number | string = parseInt(price);
-      priceNum = parseFloat(price).toFixed(2);
-      priceNum.toString()
-      price = priceNum.toString();
-      const imageUrl = productElement.querySelector('img')?.getAttribute('src') || '';
-      const link = productElement.querySelector('a')?.getAttribute('href') || '';
+    productElements.forEach((productElement: Element) => {
+      const title: string = (productElement.querySelector('.a-text-normal') as HTMLElement)?.textContent?.trim() || '';
+      const priceText: string = (productElement.querySelector('.a-price') as HTMLElement)?.textContent?.trim() || '';
+      const price: string = parseFloat(priceText.replace(/[^\d.]/g, '')).toFixed(2);
+      const imageUrl: string = (productElement.querySelector('img') as HTMLImageElement)?.getAttribute('src') || '';
+      const link: string = (productElement.querySelector('a') as HTMLAnchorElement)?.getAttribute('href') || '';
 
-      productList.push({ title, price, imageUrl, link });
-      filterList = productList.filter((item, index) =>  item.title != '')
+      if (title) {
+        productList.push({ title, price, imageUrl, link });
+      }
     });
-     
-    return filterList;
+
+    return productList.slice(0, 10);
   });
 
   await browser.close();
@@ -53,121 +56,126 @@ async function scrapeAmazon(searchString: string) {
 }
 
 const authenticateUser = async (req: Request, res: Response, next: Function) => {
-  const { username, password } = req.body;
+  const { username, password }: { username: string; password: string } = req.body;
 
-  // Check if username and password are provided
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
   next();
 };
 
-app.post('/scrape', authenticateUser, async (req: Request, res: Response) => {
-  const { username, password } = req.body;
+app.post('/scrape', authenticateUser, async (req: Request<{}, {}, { username: string; password: string, type: string }>, res: Response) => {
+  const { username, password, type } = req.body;
 
   try {
-    // Scraping logic for user's purchase history
-    const lastTenPurchases = await scrapeUserPurchaseHistory(username, password);
-    res.json(lastTenPurchases);
+    if (type === 'Capital One') {
+      const creditData = await scrapeCapitolOne(username, password);
+      res.json(creditData);
+    } else {
+      const lastTenPurchases = await scrapeUserPurchaseHistory(username, password);
+      res.json(lastTenPurchases);
+    }
+    
   } catch (error) {
     console.error('Error scraping user purchase history:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-async function scrapeUserPurchaseHistory(username: string, password: string): Promise<any[]> {
-  // Scraping logic to fetch user's purchase history from Amazon
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
+async function scrapeUserPurchaseHistory(username: string, password: string): Promise<Product[]> {
+  const browser: Browser = await puppeteer.launch();
+  const page: Page = await browser.newPage();
 
-  const selectors = {
-  emailid: 'input[name=email]',
-  password: 'input[name=password]',
-  continue: 'input[id=continue]',
-  singin: 'input[id=signInSubmit]',
-};
-  
-  // Navigate to Amazon sign-in page
-  await page.goto('https://www.amazon.com/gp/sign-in.html');
-  
-  // Fill in username and password fields
-
-    await page.waitForSelector(selectors.emailid);
-    await page.type(selectors.emailid, username, { delay: 100 });
-    await page.click(selectors.continue);
-    await page.waitForSelector(selectors.password);
-    await page.type(selectors.password, password, { delay: 100 });
-    await page.click(selectors.singin);
-    await page.waitForNavigation();
-
-  // Navigate to user's order history page
-  // await page.goto('https://www.amazon.com/gp/your-account/order-history');
-
-  // Scraping logic to extract last 10 purchases
-  // const lastTenPurchases: any[] | NodeListOf<Element> | any = await page.evaluate(() => {
-  //   // Implement logic to extract last 10 purchases from the order history page
-  // // Code for orders list 
-  // //   const ordersList = [...document.querySelectorAll('.order')];
-  // //   const ordersData: any[] = [];
-  // //   console.log(ordersList);
-  // //   ordersList.forEach((order, index) => {
-  // //     if (index > 9) {
-  // //       return;
-  // //     } else {
-  // //       ordersData.push(order)
-  // //     }
-  // //   }) 
-  // //   return ordersData;
-  // // Don't have recent orders to accurately test testing also viewed
-  //   // const similarProduct = [...document.querySelectorAll('.a-carousel-card')];
-  //   const similarProduct = document.querySelector('.num-orders')
-  //   console.log(`This is the return length${similarProduct}`);
-  //   return similarProduct;
-  //  });
-
-  await page.goto('https://www.amazon.com/gp/history/');
-
-  await page.evaluate(async () => {
-  // Define a function to scroll to the bottom of the page
-  const scrollToBottom = async () => {
-    window.scrollTo(0, document.body.scrollHeight);
-    await new Promise(resolve => setTimeout(resolve, 500)); // Wait for .5 second after scrolling
+  const selectors: { [key: string]: string } = {
+    emailid: 'input[name=email]',
+    password: 'input[name=password]',
+    continue: 'input[id=continue]',
+    singin: 'input[id=signInSubmit]',
   };
 
-  // Scroll multiple times to ensure all items are loaded to get the lazy loaded cards
-  for (let i = 0; i < 2; i++) {
-    await scrollToBottom();
-  }
-});
+  await page.goto('https://www.amazon.com/gp/sign-in.html');
 
-  const relatedItems = await page.evaluate(() => {
-  const itemsList : any | null = document.querySelectorAll('.p13n-grid-content')
-  const itemsData : any[] = [];
-  let itemsFilter: any[] = [];
-  itemsList.forEach((itemElement: any | null) => {
-    const title: any = itemElement.querySelector('.p13n-sc-line-clamp-1')?.textContent.trim();
-    const link: string = itemElement.querySelector('.a-link-normal').getAttribute('href');
-    const imageUrl = itemElement.querySelector('img')?.getAttribute('src')
-     let price = itemElement.querySelector('.a-color-price')?.textContent?.trim() || '';
-      price = price.replace(/[^\d.]/g, '');
-      let priceNum: number | string = parseInt(price);
-      priceNum = parseFloat(price).toFixed(2);
-      priceNum.toString()
-      price = priceNum.toString();
-     itemsData.push({title, imageUrl, price, link})
-  })
-  itemsData.forEach((item, index) => {
-    if ( index === 10) {
-      return;
-    } else { itemsFilter.push(item)}
-  })
-  return itemsFilter;
-});
+  await page.waitForSelector(selectors.emailid);
+  await page.type(selectors.emailid, username, { delay: 100 });
+  await page.click(selectors.continue);
+  await page.waitForSelector(selectors.password);
+  await page.type(selectors.password, password, { delay: 100 });
+  await page.click(selectors.singin);
+  await page.waitForNavigation();
+
+  await page.goto('https://www.amazon.com/gp/history/');
+  // scrolling page to wait for lazy load
+  await page.evaluate(async () => {
+    const scrollToBottom = async () => {
+      window.scrollTo(0, document.body.scrollHeight);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    };
+
+    for (let i = 0; i < 2; i++) {
+      await scrollToBottom();
+    }
+  });
+
+  const relatedItems: Product[] = await page.evaluate(() => {
+    const itemsList: NodeListOf<Element> = document.querySelectorAll('.p13n-grid-content');
+    const itemsData: Product[] = [];
+
+    itemsList.forEach((itemElement: Element) => {
+      const title: string = (itemElement.querySelector('.p13n-sc-line-clamp-1') as HTMLElement)?.textContent?.trim() || '';
+      const link: string = (itemElement.querySelector('.a-link-normal') as HTMLAnchorElement)?.getAttribute('href') || '';
+      const imageUrl: string = (itemElement.querySelector('img') as HTMLImageElement)?.getAttribute('src') || '';
+      const priceText: string = (itemElement.querySelector('.a-color-price') as HTMLElement)?.textContent?.trim() || '';
+      const price: string = parseFloat(priceText.replace(/[^\d.]/g, '')).toFixed(2);
+
+      itemsData.push({ title, imageUrl, price, link });
+    });
+
+    return itemsData.slice(0, 10);
+  });
 
   await browser.close();
-  console.log(relatedItems)
   return relatedItems;
 }
+
+async function scrapeCapitolOne(username: string, password: string): Promise<Product[]> {
+  const browser: Browser = await puppeteer.launch();
+  const page: Page = await browser.newPage();
+
+   const selectors: { [key: string]: string } = {
+    user: 'input[id=usernameInputField]',
+    password: 'input[id=pwInputField]',
+    signIn: 'button[type=submit]',
+  };
+
+  try {
+    console.log('Navigating to Capital One sign-in page...');
+    await page.goto('https://verified.capitalone.com/auth/signin');
+    console.log('Waiting for sign-in form to load...');
+    await page.waitForSelector(selectors.user);
+    console.log('Typing username...');
+    await page.type(selectors.user, username);
+    console.log('Typing password...');
+    await page.type(selectors.password, password);
+    console.log('Clicking sign-in button...');
+    await page.click(selectors.signIn);
+
+    // Wait for navigation to complete
+    console.log('Waiting for navigation...');
+    await page.waitForNavigation({ waitUntil: 'networkidle0' });
+
+    // Your scraping logic here...
+    console.log('Scraping user purchase history...');
+
+    await browser.close();
+    console.log('Browser closed successfully.');
+    return [{ title: 'string', price: 'string', imageUrl: 'string', link: 'string' }, { title: 'string', price: 'string', imageUrl: 'string', link: 'string' }];
+  } catch (error) {
+    console.error('Error scraping Capital One:', error);
+    await browser.close();
+    throw error; // Rethrow the error to handle it at a higher level
+  }
+}
+
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
