@@ -166,7 +166,6 @@ async function scrapeCapitolOne(username: string, password: string): Promise<Pro
     console.log('Waiting for navigation...');
     await page.waitForNavigation({ waitUntil: 'networkidle0' });
 
-    // Your scraping logic here...
     console.log('Scraping user purchase history...');
 
     await browser.close();

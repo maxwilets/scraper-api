@@ -154,7 +154,6 @@ function scrapeCapitolOne(username, password) {
             // Wait for navigation to complete
             console.log('Waiting for navigation...');
             yield page.waitForNavigation({ waitUntil: 'networkidle0' });
-            // Your scraping logic here...
             console.log('Scraping user purchase history...');
             yield browser.close();
             console.log('Browser closed successfully.');
